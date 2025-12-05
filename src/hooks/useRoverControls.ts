@@ -19,6 +19,8 @@ export interface RoverControls {
   setSpeed: (value: number) => void
   toggleDrive: () => void
   setDriveEnabled: (value: boolean) => void
+  setInputState: (value: InputState) => void
+  setInput: (value: Partial<InputState>) => void
   reset: () => void
   resetSignal: number
   getInputState: () => InputState
@@ -61,6 +63,16 @@ export function useRoverControls(initialSpeed = DEFAULT_SPEED): RoverControls {
       clearKeys()
     }
   }, [clearKeys])
+
+  const setInput = useCallback((value: Partial<InputState>) => {
+    if (!driveEnabledRef.current) return
+    keysRef.current = { ...keysRef.current, ...value }
+  }, [])
+
+  const setInputState = useCallback((value: InputState) => {
+    if (!driveEnabledRef.current) return
+    keysRef.current = { ...value }
+  }, [])
 
   const setSpeed = useCallback((value: number) => {
     setSpeedState(value)
@@ -121,11 +133,13 @@ export function useRoverControls(initialSpeed = DEFAULT_SPEED): RoverControls {
       setSpeed,
       toggleDrive,
       setDriveEnabled,
+      setInput,
+      setInputState,
       reset,
       resetSignal,
       getInputState,
     }),
-    [driveEnabled, speed, setSpeed, toggleDrive, setDriveEnabled, reset, resetSignal, getInputState],
+    [driveEnabled, speed, setSpeed, toggleDrive, setDriveEnabled, setInput, setInputState, reset, resetSignal, getInputState],
   )
 
   return controls

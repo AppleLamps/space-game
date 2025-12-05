@@ -51,5 +51,41 @@ describe('useRoverControls', () => {
     expect(ref.current?.driveEnabled).toBe(false)
     expect(ref.current?.speed).toBe(3)
   })
+
+  it('applies external input only when drive is enabled', () => {
+    const ref = { current: null as ControlsSnapshot | null }
+    render(<ControlsHarness ref={ref} initialSpeed={4} />)
+
+    act(() => {
+      ref.current?.setInput({ forward: true })
+    })
+    expect(ref.current?.getInputState()).toEqual({
+      forward: false,
+      backward: false,
+      left: false,
+      right: false,
+    })
+
+    act(() => {
+      ref.current?.toggleDrive()
+      ref.current?.setInput({ forward: true, left: true })
+    })
+    expect(ref.current?.getInputState()).toEqual({
+      forward: true,
+      backward: false,
+      left: true,
+      right: false,
+    })
+
+    act(() => {
+      ref.current?.setInputState({ forward: false, backward: true, left: false, right: true })
+    })
+    expect(ref.current?.getInputState()).toEqual({
+      forward: false,
+      backward: true,
+      left: false,
+      right: true,
+    })
+  })
 })
 

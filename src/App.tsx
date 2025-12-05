@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, StatsGl } from '@react-three/drei'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { MathUtils, Vector3 } from 'three'
+import { Vector3 } from 'three'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Lighting from './components/scene/Lighting'
 import Rover from './components/scene/Rover'
@@ -10,7 +10,7 @@ import MiniMap from './components/ui/MiniMap'
 import ControlsPanel from './components/ui/ControlsPanel'
 import HudOverlay from './components/ui/HudOverlay'
 import { useRoverControls } from './hooks/useRoverControls'
-import type { RoverPose, RoverTelemetry } from './types/rover'
+import type { RoverPose } from './types/rover'
 import { CAMERA_DEFAULT_POSITION, CAMERA_DEFAULT_TARGET } from './constants/camera'
 import { ROVER_RESET_Y, TRACTION, ROVER_TUNING_PRESETS } from './constants/rover'
 import { BREADCRUMB_LIMIT } from './constants/minimap'
@@ -21,6 +21,7 @@ import BreadcrumbToggle from './components/ui/BreadcrumbToggle'
 import { useSimState } from './state/useSimState'
 import { setRoverPreset, useSettings } from './hooks/useSettingsStore'
 import CameraController from './components/scene/CameraController'
+import { useTelemetryBridge } from './hooks/useTelemetryBridge'
 
 function App() {
   const controls = useRoverControls()
@@ -34,15 +35,13 @@ function App() {
   const biome = biomes[biomeId]
   const [rocks, setRocks] = useState<{ position: Vector3; radius: number }[]>([])
   const [trailEnabled, setTrailEnabled] = useState(true)
-  const [trail, setTrail] = useState<[number, number, number][]>([])
+  const trailRef = useRef<[number, number, number][]>([])
+  const [, forceTrailRender] = useState(0)
   const [minimapZoom, setMinimapZoom] = useState(() => settings.minimap.defaultZoom)
   const [traction, setTraction] = useState(TRACTION)
-  const [hudState, setHudState] = useState({ rpm: 0, slipping: false, pitch: 0, roll: 0, fps: 0 })
   const [cameraPreset, setCameraPreset] = useState<'default' | 'top' | 'chase'>('default')
-  const telemetryRef = useRef<RoverTelemetry>({ rpm: 0, slipping: false, pitch: 0, roll: 0 })
-  const fpsRef = useRef(0)
-  const isPlayingRef = useRef(replay.state.isPlaying)
   const poseRef = useRef<RoverPose>(pose)
+  const { hudState, updateTelemetry } = useTelemetryBridge({ tick, isPlaying: replay.state.isPlaying })
 
   useEffect(() => {
     controls.setDriveEnabled(sim.allowInput)
@@ -53,11 +52,6 @@ function App() {
       sim.send({ type: 'stopPlayback' })
     }
   }, [replay.state.isPlaying, sim])
-
-  useEffect(() => {
-    isPlayingRef.current = replay.state.isPlaying
-  }, [replay.state.isPlaying])
-
   useEffect(() => {
     poseRef.current = pose
   }, [pose])
@@ -67,14 +61,13 @@ function App() {
       setPose(nextPose)
       replay.recordPose(nextPose)
       if (trailEnabled) {
-        setTrail((prev) => {
-          const next = [...prev, nextPose.position]
-          if (next.length > BREADCRUMB_LIMIT) next.shift()
-          return next
-        })
+        const target = trailRef.current
+        target.push(nextPose.position)
+        if (target.length > BREADCRUMB_LIMIT) target.shift()
+        forceTrailRender((value) => value + 1)
       }
     },
-    [replay, trailEnabled],
+    [forceTrailRender, replay, trailEnabled],
   )
 
   const handleResetCamera = useCallback(() => {
@@ -125,52 +118,10 @@ function App() {
   const handleChangeBiome = useCallback((id: string) => {
     if (biomes[id as BiomeId]) {
       setBiomeId(id as BiomeId)
-      setTrail([])
+      trailRef.current = []
+      forceTrailRender((value) => value + 1)
     }
-  }, [])
-
-  useEffect(() => {
-    let frameId: number
-    let lastFrame = performance.now()
-    let lastHudUpdate = performance.now()
-    let lastPlayheadUpdate = performance.now()
-
-    const loop = () => {
-      const now = performance.now()
-      const dt = now - lastFrame || 16
-      lastFrame = now
-
-      fpsRef.current = Math.max(1, MathUtils.lerp(fpsRef.current || 60, 1000 / dt, 0.12))
-
-      if (isPlayingRef.current && now - lastPlayheadUpdate >= 50) {
-        tick()
-        lastPlayheadUpdate = now
-      }
-
-      if (now - lastHudUpdate >= 150) {
-        const nextHud = {
-          rpm: telemetryRef.current.rpm,
-          slipping: telemetryRef.current.slipping,
-          pitch: telemetryRef.current.pitch,
-          roll: telemetryRef.current.roll,
-          fps: fpsRef.current,
-        }
-        setHudState((prev) => (prev.rpm === nextHud.rpm
-          && prev.slipping === nextHud.slipping
-          && prev.pitch === nextHud.pitch
-          && prev.roll === nextHud.roll
-          && prev.fps === nextHud.fps
-          ? prev
-          : nextHud))
-        lastHudUpdate = now
-      }
-
-      frameId = requestAnimationFrame(loop)
-    }
-
-    frameId = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(frameId)
-  }, [tick])
+  }, [forceTrailRender])
 
   const handleSeek = useCallback(
     (value: number) => {
@@ -218,12 +169,12 @@ function App() {
             traction={traction}
             tuning={settings.rover}
             onTelemetry={({ rpm: rpmReading, slipping: slipState, pitch: pitchDeg, roll: rollDeg }) => {
-              telemetryRef.current = {
+              updateTelemetry({
                 rpm: rpmReading,
                 slipping: slipState,
                 pitch: pitchDeg,
                 roll: rollDeg,
-              }
+              })
             }}
           />
           {ghostPose && <Ghost pose={ghostPose} />}
@@ -319,7 +270,7 @@ function App() {
                 </button>
                 <BreadcrumbToggle enabled={trailEnabled} onToggle={() => setTrailEnabled((v) => !v)} />
               </div>
-              <MiniMap pose={pose} ghostPose={ghostPose} zoom={minimapZoom} trail={trail} />
+              <MiniMap pose={pose} ghostPose={ghostPose} zoom={minimapZoom} trail={trailRef.current} />
             </div>
           </div>
         </div>
