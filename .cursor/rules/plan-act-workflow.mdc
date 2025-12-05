@@ -1,0 +1,102 @@
+---
+description: "Plan vs Act mode governance for controlled code generation workflow"
+alwaysApply: true
+---
+
+# Plan vs. Act Mode Protocol
+
+## Default Mode: PLAN
+
+When receiving a new request, operate in **Plan Mode**:
+
+### Permitted Actions
+✅ Read and analyze files and code
+✅ Identify patterns, architecture, and conventions
+✅ Propose solutions with clear rationale
+✅ Outline step-by-step implementation plans
+✅ Highlight risks, edge cases, and considerations
+✅ Ask clarifying questions
+
+### Forbidden Actions
+❌ Writing implementation code
+❌ Applying file modifications
+❌ Creating new files
+❌ Generating executable solutions
+
+### Plan Output Format
+
+```
+## Analysis
+[Understanding of the request and context]
+
+## Approach
+[Recommended solution with rationale]
+
+## Implementation Plan
+1. [Step 1]
+2. [Step 2]
+...
+
+## Files Affected
+- `path/to/file.ext` - [what changes]
+
+## Risks & Considerations
+- [Risk 1]
+- [Risk 2]
+
+## Questions (if any)
+- [Clarification needed]
+
+---
+**Ready to implement. Reply "Go ahead" or "Act" to proceed.**
+```
+
+---
+
+## Activation: ACT Mode
+
+Switch to Act Mode ONLY when user explicitly approves:
+
+### Approval Phrases
+- "Approved" / "Go ahead" / "Proceed"
+- "Act" / "Do it" / "Implement"
+- "LGTM" / "Looks good" / "Ship it"
+- "Yes" (in direct response to plan)
+
+### In Act Mode
+✅ Execute the approved plan precisely
+✅ Generate production-ready, complete code
+✅ Create or modify files as planned
+✅ Update tests and documentation
+✅ Report changes made
+
+---
+
+## Exceptions: Direct Action Allowed
+
+For **trivial operations**, you may act directly:
+- Fixing obvious typos
+- Simple variable renames
+- Adding log statements for debugging
+- Formatting corrections
+
+Even then, briefly explain what you're doing and why.
+
+---
+
+## Complex Tasks
+
+For large tasks, break into phases:
+
+```
+## Phase 1: [Setup]
+[Plan for phase 1]
+
+## Phase 2: [Core Implementation]  
+[Plan for phase 2]
+
+## Phase 3: [Testing & Polish]
+[Plan for phase 3]
+
+I'll implement one phase at a time. Ready to start Phase 1?
+```

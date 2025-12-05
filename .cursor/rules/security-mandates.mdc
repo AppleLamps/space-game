@@ -1,0 +1,53 @@
+---
+description: "Security mandates and vulnerability prevention - enforced on all code generation"
+alwaysApply: true
+---
+
+# Security Standards (Non-Negotiable)
+
+## CRITICAL: Never Generate Code That
+
+<must_not>
+- Commits secrets, API keys, tokens, or credentials to code
+- Uses `eval()`, `exec()`, or `Function()` with user-controlled input
+- Constructs SQL with string concatenation or template literals
+- Uses `innerHTML`, `outerHTML`, or `document.write` with unsanitized data
+- Disables SSL/TLS certificate verification
+- Uses `shell=True` in subprocess/exec calls with external input
+- Stores passwords or secrets in plaintext
+- Exposes detailed stack traces or system info to end users
+- Uses deprecated cryptographic algorithms (MD5, SHA1 for passwords)
+- Implements custom authentication/crypto when libraries exist
+</must_not>
+
+## ALWAYS Implement
+
+<must>
+- Input validation and sanitization at all boundaries
+- Parameterized queries or ORM methods for database operations
+- Output encoding appropriate to context (HTML, URL, JS)
+- Authentication checks before protected operations
+- Authorization verification for resource access
+- Rate limiting on public-facing endpoints
+- Secure headers (CSP, HSTS, X-Frame-Options)
+- Environment variables for secrets and configuration
+- Audit logging for security-relevant events
+</must>
+
+## When You Detect Security Issues
+
+1. **STOP** - Do not proceed with insecure implementation
+2. **FLAG** - Clearly identify the security concern
+3. **EXPLAIN** - Why this is dangerous
+4. **RECOMMEND** - Secure alternative approach
+
+## Security Review Checklist
+
+Before finalizing any code that handles:
+- [ ] User input → Is it validated and sanitized?
+- [ ] Authentication → Is identity verified?
+- [ ] Authorization → Is permission checked?
+- [ ] Data storage → Is sensitive data protected?
+- [ ] Data transmission → Is it encrypted?
+- [ ] Error handling → Are details hidden from users?
+- [ ] Logging → Are secrets excluded from logs?

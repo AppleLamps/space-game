@@ -1,0 +1,222 @@
+---
+description: "React and Next.js component patterns, Server Components, and performance standards"
+globs: ["**/*.tsx", "**/*.jsx", "**/app/**", "**/pages/**", "**/components/**"]
+alwaysApply: false
+---
+
+# React & Next.js Standards
+
+## Component Architecture
+
+### Server vs Client Components (Next.js 13+)
+
+<critical_rule>
+**DEFAULT TO SERVER COMPONENTS**
+
+Only add `"use client"` when the component REQUIRES:
+- React hooks (useState, useEffect, useContext, etc.)
+- Browser APIs (window, document, localStorage)
+- Event listeners (onClick, onChange, onSubmit)
+- Third-party client libraries
+</critical_rule>
+
+```typescript
+// ✅ Server Component (default) - no directive needed
+async function ProductList() {
+  const products = await db.products.findMany(); // Direct DB access!
+  return (
+    <ul>
+      {products.map(p => <ProductCard key={p.id} product={p} />)}
+    </ul>
+  );
+}
+
+// ✅ Client Component - only when necessary
+"use client";
+function AddToCartButton({ productId }: { productId: string }) {
+  const [pending, setPending] = useState(false);
+  // ...interactive logic
+}
+```
+
+### Component Structure
+
+```typescript
+// Component file structure
+import { type ReactNode } from 'react';
+
+// Types at the top
+interface ComponentProps {
+  title: string;
+  children?: ReactNode;
+  onAction?: () => void;
+}
+
+// Main component
+export function Component({ title, children, onAction }: ComponentProps) {
+  // 1. Hooks (in consistent order)
+  const [state, setState] = useState(initialState);
+  const ref = useRef<HTMLDivElement>(null);
+  
+  // 2. Derived state / computations
+  const derivedValue = useMemo(() => compute(state), [state]);
+  
+  // 3. Effects
+  useEffect(() => {
+    // effect logic
+  }, [dependencies]);
+  
+  // 4. Event handlers
+  const handleClick = useCallback(() => {
+    onAction?.();
+  }, [onAction]);
+  
+  // 5. Early returns (loading, error, empty states)
+  if (!state) return <LoadingSkeleton />;
+  
+  // 6. Main render
+  return (
+    <div ref={ref}>
+      <h1>{title}</h1>
+      {children}
+    </div>
+  );
+}
+```
+
+## State Management
+
+### State Location Hierarchy
+
+1. **URL State** (searchParams) - filters, pagination, shareable state
+2. **Server State** - data from APIs/database (use React Query, SWR, or Server Components)
+3. **Local Component State** - UI-only state (modals, form inputs)
+4. **Context** - deeply shared state (theme, auth user)
+5. **Global State** (Zustand, Redux) - complex cross-cutting state
+
+```typescript
+// ✅ Good: URL-driven state for filters
+function ProductFilters() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  const setFilter = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set(key, value);
+    router.push(`?${params.toString()}`);
+  };
+}
+
+// ❌ Bad: useState for shareable/bookmarkable state
+function ProductFilters() {
+  const [category, setCategory] = useState('all'); // Lost on refresh!
+}
+```
+
+## Performance Patterns
+
+### Suspense Boundaries
+
+```typescript
+// ✅ Good: Granular suspense for independent data
+function Dashboard() {
+  return (
+    <div>
+      <Suspense fallback={<StatsSkeleton />}>
+        <StatsPanel />
+      </Suspense>
+      <Suspense fallback={<ChartSkeleton />}>
+        <RevenueChart />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+### Memoization
+
+```typescript
+// ✅ Memoize expensive computations
+const sortedItems = useMemo(
+  () => items.sort((a, b) => complexSort(a, b)),
+  [items]
+);
+
+// ✅ Memoize callbacks passed to optimized children
+const handleSelect = useCallback(
+  (id: string) => onSelect(id),
+  [onSelect]
+);
+
+// ❌ Don't over-memoize simple values
+const doubled = useMemo(() => count * 2, [count]); // Overkill
+```
+
+## Form Handling
+
+```typescript
+// ✅ Server Actions for forms (Next.js)
+async function submitForm(formData: FormData) {
+  "use server";
+  const data = Object.fromEntries(formData);
+  // validate and process
+}
+
+function ContactForm() {
+  return (
+    <form action={submitForm}>
+      <input name="email" type="email" required />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+```
+
+## Accessibility Standards
+
+<must>
+- Use semantic HTML (`button`, `nav`, `main`, `article`)
+- Include `alt` text for all images
+- Ensure keyboard navigation works
+- Use ARIA attributes when semantic HTML isn't sufficient
+- Maintain focus management in modals/dialogs
+- Test with screen readers
+</must>
+
+```typescript
+// ✅ Good: Accessible button
+<button 
+  onClick={handleDelete}
+  aria-label="Delete item"
+  aria-describedby="delete-warning"
+>
+  <TrashIcon aria-hidden="true" />
+</button>
+
+// ❌ Bad: Div as button
+<div onClick={handleDelete} className="button">
+  Delete
+</div>
+```
+
+## File Organization (Feature-Based)
+
+```
+src/
+├── app/                    # Next.js app router
+│   ├── (auth)/            # Route groups
+│   │   ├── login/
+│   │   └── register/
+│   └── dashboard/
+├── components/
+│   ├── ui/                # Reusable primitives
+│   │   ├── Button.tsx
+│   │   └── Input.tsx
+│   └── features/          # Feature-specific
+│       └── checkout/
+│           ├── CartSummary.tsx
+│           └── PaymentForm.tsx
+├── hooks/                 # Shared hooks
+├── lib/                   # Utilities, API clients
+└── types/                 # Shared types
+```

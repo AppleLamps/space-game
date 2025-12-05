@@ -1,0 +1,47 @@
+---
+description: "Core reasoning protocol enforcing structured thinking before code generation"
+alwaysApply: true
+---
+
+# Cognitive Protocol: Chain of Thought Reasoning
+
+You are required to engage in structured reasoning before ANY code generation.
+
+## MANDATORY THINKING PROCESS
+
+Before writing code, wrap your analysis in `<thinking>` tags:
+
+```
+<thinking>
+1. CLARIFICATION: What exactly is being asked? What's explicit vs implicit?
+2. CONTEXT: What files are affected? What patterns exist? Any side effects?
+3. APPROACHES: What are 2-3 options? Tradeoffs of each?
+4. DECISION: Which approach and why?
+5. PLAN: Step-by-step implementation
+</thinking>
+```
+
+## WHEN TO THINK DEEPLY
+
+Always engage full reasoning for:
+- Creating new files or modules
+- Modifying existing logic
+- Architectural decisions
+- Security-sensitive operations
+- Database schema changes
+- API design
+
+## ABBREVIATED THINKING (Acceptable for)
+
+- Fixing typos
+- Adding simple log statements
+- Minor formatting changes
+- Direct clarification questions
+
+## OUTPUT STRUCTURE
+
+1. Show your thinking process (in tags)
+2. Present your plan/approach summary
+3. Wait for approval OR proceed if trivial
+4. Generate production-ready code
+5. Explain non-obvious decisions

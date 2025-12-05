@@ -1,0 +1,126 @@
+---
+description: "Memory Bank protocol for persistent project context and knowledge management"
+alwaysApply: false
+globs: ["**/memory/**", "**/.memory/**", "**/docs/memory/**"]
+---
+
+# Memory Bank Integration Protocol
+
+The Memory Bank provides persistent project context across sessions. When present, it is your source of truth for project decisions and current state.
+
+## Memory Bank Structure
+
+| File | Purpose | When to Reference |
+|------|---------|-------------------|
+| `projectbrief.md` | North Star - goals, scope, success metrics | Every session start; architectural decisions |
+| `productContext.md` | The Why - user personas, stories, strategy | UX decisions; feature prioritization |
+| `systemPatterns.md` | The How - architecture, patterns, conventions | Before writing any code |
+| `activeContext.md` | The Now - current focus, open questions | Every session; task context |
+| `progress.md` | The Status - completed, pending, known issues | Task planning; status checks |
+
+---
+
+## Session Start Protocol
+
+When beginning work on this project:
+
+1. **Read `projectbrief.md`** 
+   - Understand the project's purpose and constraints
+   - Note any non-negotiable requirements
+
+2. **Read `systemPatterns.md`**
+   - Identify established architectural patterns
+   - Note technology choices and conventions
+   - Understand the "shape" of the codebase
+
+3. **Read `activeContext.md`**
+   - Understand current development focus
+   - Note any blockers or open decisions
+   - Identify what was worked on last
+
+4. **Scan `progress.md`**
+   - Understand completed vs pending work
+   - Note known issues to avoid
+
+---
+
+## During Development
+
+### Before Making Changes
+- Cross-reference proposed changes with `systemPatterns.md`
+- Flag any conflicts with established patterns
+- Ensure alignment with `projectbrief.md` goals
+
+### When Patterns Conflict
+```
+⚠️ PATTERN CONFLICT DETECTED
+
+Proposed: [what you're about to do]
+Established Pattern: [what systemPatterns.md says]
+
+Options:
+1. Follow established pattern: [how]
+2. Update pattern (requires justification): [why change]
+
+Which approach should we take?
+```
+
+---
+
+## Session End / Task Completion Protocol
+
+### Update `progress.md`
+```markdown
+## [Date] - [Brief Description]
+- ✅ Completed: [what was done]
+- 🔄 In Progress: [what's partially done]  
+- ❌ Blocked: [what's blocked and why]
+- 📝 Notes: [relevant observations]
+```
+
+### Update `activeContext.md` (if focus shifted)
+```markdown
+## Current Focus
+[Updated focus area]
+
+## Recent Decisions
+- [Decision made and rationale]
+
+## Open Questions
+- [Any new questions raised]
+```
+
+### Suggest `systemPatterns.md` Updates
+If new patterns were established:
+```
+📋 SUGGESTED PATTERN UPDATE
+
+New pattern introduced: [description]
+Location: [where it was implemented]
+Rationale: [why this pattern]
+
+Add to systemPatterns.md? [Y/N]
+```
+
+---
+
+## Memory Bank Maintenance
+
+### Signs Memory Bank Needs Updates
+- `activeContext.md` references completed work
+- `progress.md` is significantly out of date
+- New architectural patterns not documented
+- Project goals have evolved
+
+### Proactive Maintenance
+When you notice outdated information:
+```
+📝 MEMORY BANK UPDATE SUGGESTED
+
+File: [filename]
+Current Content: [outdated info]
+Suggested Update: [new info]
+Reason: [why update needed]
+
+Should I draft the update?
+```

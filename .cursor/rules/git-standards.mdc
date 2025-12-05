@@ -1,0 +1,149 @@
+---
+description: "Git commit standards, branch naming, and code review guidelines"
+globs: ["**/.git/**", "**/.gitignore", "**/CHANGELOG*", "**/CONTRIBUTING*"]
+alwaysApply: false
+---
+
+# Git & Code Review Standards
+
+## Commit Message Format
+
+Follow Conventional Commits:
+
+```
+<type>(<scope>): <subject>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Types
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `style` | Formatting, no code change |
+| `refactor` | Code change that neither fixes nor adds |
+| `perf` | Performance improvement |
+| `test` | Adding/updating tests |
+| `chore` | Maintenance tasks |
+| `ci` | CI/CD changes |
+| `build` | Build system changes |
+
+### Examples
+
+```
+feat(auth): add OAuth2 login with Google
+
+Implements Google OAuth2 flow using passport-google-oauth20.
+Adds new routes, middleware, and user model fields.
+
+Closes #123
+```
+
+```
+fix(api): prevent race condition in order processing
+
+Orders were occasionally duplicated when users double-clicked.
+Added idempotency key validation at the controller level.
+
+Fixes #456
+```
+
+### Subject Line Rules
+- Use imperative mood ("add" not "added")
+- No period at the end
+- Max 50 characters (72 absolute max)
+- Lowercase after type
+
+## Branch Naming
+
+```
+<type>/<ticket-id>-<brief-description>
+```
+
+Examples:
+- `feat/AUTH-123-google-oauth`
+- `fix/BUG-456-order-duplication`
+- `refactor/TECH-789-extract-user-service`
+- `chore/INFRA-012-update-dependencies`
+
+## Pull Request Guidelines
+
+### PR Title
+Same as commit message format for squash merges:
+```
+feat(auth): add OAuth2 login with Google
+```
+
+### PR Description Template
+
+```markdown
+## Summary
+[Brief description of changes]
+
+## Changes
+- [Change 1]
+- [Change 2]
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Manual testing performed
+- [ ] E2E tests pass
+
+## Screenshots
+[If UI changes]
+
+## Related Issues
+Closes #123
+```
+
+## Code Review Checklist
+
+### Functionality
+- [ ] Does it solve the stated problem?
+- [ ] Are edge cases handled?
+- [ ] Are error scenarios covered?
+
+### Code Quality
+- [ ] Is the code readable and self-documenting?
+- [ ] Are functions small and focused?
+- [ ] Is there unnecessary duplication?
+- [ ] Are naming conventions followed?
+
+### Security
+- [ ] Input validation present?
+- [ ] No secrets in code?
+- [ ] Proper authorization checks?
+- [ ] SQL injection protected?
+
+### Testing
+- [ ] Adequate test coverage?
+- [ ] Tests are meaningful, not just for coverage?
+- [ ] Edge cases tested?
+
+### Performance
+- [ ] No obvious N+1 queries?
+- [ ] Large data sets handled efficiently?
+- [ ] Caching considered where appropriate?
+
+## Git Best Practices
+
+<must>
+- Commit early and often (small, logical units)
+- Write meaningful commit messages
+- Keep PRs small and focused (< 400 lines ideal)
+- Rebase feature branches before merging
+- Never force push to main/master
+- Use `.gitignore` for generated files
+</must>
+
+<must_not>
+- Commit secrets, keys, or credentials
+- Commit large binary files
+- Mix formatting changes with logic changes
+- Leave commented-out code
+- Include `console.log` / `print` debugging
+</must_not>

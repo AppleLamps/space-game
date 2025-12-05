@@ -1,0 +1,240 @@
+---
+description: "Python best practices for FastAPI, Django, and general development"
+globs: ["**/*.py", "**/requirements*.txt", "**/pyproject.toml", "**/Pipfile"]
+alwaysApply: false
+---
+
+# Python Development Standards
+
+## Code Style
+
+### Follow PEP 8 with Modern Tooling
+- Use `ruff` or `black` for formatting
+- Use `mypy` for type checking
+- Line length: 88 characters (black default)
+
+### Type Hints (Required)
+
+```python
+# ✅ Good: Fully typed
+from typing import Optional
+from collections.abc import Sequence
+
+def process_users(
+    users: Sequence[User],
+    filter_active: bool = True,
+) -> list[ProcessedUser]:
+    """Process and return filtered users."""
+    ...
+
+# ❌ Bad: No types
+def process_users(users, filter_active=True):
+    ...
+```
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|---------|
+| Variables/Functions | snake_case | `get_user_by_id` |
+| Classes | PascalCase | `UserService` |
+| Constants | SCREAMING_SNAKE | `MAX_CONNECTIONS` |
+| Private | Leading underscore | `_internal_method` |
+| Protected | Leading underscore | `_helper_function` |
+
+## Error Handling
+
+```python
+# ✅ Good: Specific exceptions, proper context
+class UserNotFoundError(Exception):
+    def __init__(self, user_id: str):
+        self.user_id = user_id
+        super().__init__(f"User not found: {user_id}")
+
+async def get_user(user_id: str) -> User:
+    user = await db.users.find_one(id=user_id)
+    if not user:
+        raise UserNotFoundError(user_id)
+    return user
+
+# ❌ Bad: Bare except, no context
+def get_user(user_id):
+    try:
+        return db.get(user_id)
+    except:  # Never do this
+        return None
+```
+
+## FastAPI Standards
+
+### Request/Response Models
+
+```python
+from pydantic import BaseModel, Field, EmailStr
+from datetime import datetime
+
+# Request model - validation built-in
+class UserCreate(BaseModel):
+    email: EmailStr
+    name: str = Field(..., min_length=1, max_length=100)
+    
+    model_config = {"extra": "forbid"}  # Reject unknown fields
+
+# Response model - control what's exposed
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    created_at: datetime
+    
+    model_config = {"from_attributes": True}
+```
+
+### Dependency Injection
+
+```python
+from fastapi import Depends, HTTPException, status
+from typing import Annotated
+
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[Database, Depends(get_db)],
+) -> User:
+    user = await authenticate(token, db)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+        )
+    return user
+
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+@router.get("/me")
+async def get_profile(user: CurrentUser) -> UserResponse:
+    return user
+```
+
+### Error Responses
+
+```python
+from fastapi import HTTPException, status
+
+# Use appropriate status codes
+raise HTTPException(
+    status_code=status.HTTP_404_NOT_FOUND,
+    detail={"error": "user_not_found", "user_id": user_id}
+)
+
+# Never expose internal errors
+# ❌ Bad
+raise HTTPException(500, detail=str(e))  # Leaks internals
+
+# ✅ Good
+logger.exception("Database error during user fetch")
+raise HTTPException(500, detail="An unexpected error occurred")
+```
+
+## Security Rules
+
+<must_not>
+- Use `subprocess` with `shell=True` and user input
+- Use `eval()`, `exec()`, or `compile()` with user input
+- Construct SQL queries with string formatting
+- Store secrets in code
+- Use `pickle` with untrusted data
+- Disable SSL verification (`verify=False`)
+</must_not>
+
+```python
+# ✅ Safe subprocess
+import subprocess
+subprocess.run(["ls", "-la", user_provided_path], shell=False)
+
+# ❌ Dangerous subprocess
+subprocess.run(f"ls -la {user_input}", shell=True)  # Command injection!
+
+# ✅ Safe SQL (with SQLAlchemy)
+result = session.execute(
+    select(User).where(User.email == email)
+)
+
+# ❌ Dangerous SQL
+result = session.execute(f"SELECT * FROM users WHERE email = '{email}'")
+```
+
+## Project Structure
+
+```
+project/
+├── src/
+│   └── project_name/
+│       ├── __init__.py
+│       ├── main.py           # Application entry
+│       ├── config.py         # Settings/configuration
+│       ├── api/
+│       │   ├── __init__.py
+│       │   ├── routes/       # Route handlers
+│       │   └── deps.py       # Dependencies
+│       ├── core/
+│       │   ├── security.py
+│       │   └── exceptions.py
+│       ├── models/           # Database models
+│       ├── schemas/          # Pydantic models
+│       ├── services/         # Business logic
+│       └── utils/
+├── tests/
+│   ├── conftest.py
+│   ├── unit/
+│   └── integration/
+├── pyproject.toml           # Modern dependency management
+└── .env.example
+```
+
+## Dependency Management
+
+<must>
+- Use `pyproject.toml` with `uv`, `poetry`, or modern tools
+- Pin dependencies with lock files
+- Separate dev/test/prod dependencies
+- Regularly audit for vulnerabilities
+</must>
+
+```toml
+# pyproject.toml
+[project]
+dependencies = [
+    "fastapi>=0.100.0",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+```
+
+## Testing
+
+```python
+import pytest
+from httpx import AsyncClient
+
+@pytest.fixture
+async def client(app) -> AsyncClient:
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
+
+@pytest.mark.asyncio
+async def test_create_user(client: AsyncClient, db_session):
+    """Test user creation with valid data."""
+    response = await client.post(
+        "/users",
+        json={"email": "test@example.com", "name": "Test User"}
+    )
+    
+    assert response.status_code == 201
+    assert response.json()["email"] == "test@example.com"
+```

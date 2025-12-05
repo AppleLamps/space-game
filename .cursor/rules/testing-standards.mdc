@@ -1,0 +1,217 @@
+---
+description: "Testing standards and TDD patterns for unit, integration, and e2e tests"
+globs: ["**/*.test.*", "**/*.spec.*", "**/test_*.py", "**/__tests__/**", "**/tests/**"]
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Core Testing Principles
+
+<must>
+- Test behavior, not implementation
+- One logical assertion per test (can have multiple related asserts)
+- Tests must be independent and idempotent
+- Use descriptive test names that explain the scenario
+- Follow Arrange-Act-Assert (AAA) pattern
+- Mock external dependencies, not internal logic
+</must>
+
+## Test Naming
+
+```typescript
+// ✅ Good: Describes scenario and expected outcome
+describe('UserService', () => {
+  describe('createUser', () => {
+    it('should create user and return sanitized response when valid data provided', async () => {});
+    it('should throw ValidationError when email format is invalid', async () => {});
+    it('should throw ConflictError when email already exists', async () => {});
+  });
+});
+
+// ❌ Bad: Vague names
+describe('UserService', () => {
+  it('should work', () => {});
+  it('test createUser', () => {});
+  it('handles errors', () => {});
+});
+```
+
+## Test Structure (AAA Pattern)
+
+```typescript
+it('should calculate total with discount applied', () => {
+  // Arrange - Set up test data and dependencies
+  const items = [
+    { price: 100, quantity: 2 },
+    { price: 50, quantity: 1 },
+  ];
+  const discount = 0.1; // 10%
+  
+  // Act - Execute the code under test
+  const result = calculateTotal(items, discount);
+  
+  // Assert - Verify the outcome
+  expect(result).toBe(225); // (200 + 50) * 0.9
+});
+```
+
+## What to Test
+
+### Test Pyramid
+1. **Unit Tests (70%)** - Individual functions, classes, components
+2. **Integration Tests (20%)** - API endpoints, database operations, service interactions
+3. **E2E Tests (10%)** - Critical user flows, happy paths
+
+### Unit Test Focus
+
+<must>
+- Business logic and calculations
+- Data transformations
+- Conditional branches
+- Edge cases and boundary conditions
+- Error handling paths
+</must>
+
+<must_not>
+- External API calls (mock them)
+- Database queries (mock the repository)
+- File system operations (mock fs)
+- Implementation details (private methods, internal state)
+</must_not>
+
+## Mocking Guidelines
+
+```typescript
+// ✅ Good: Mock at the boundary
+const mockUserRepository = {
+  findById: jest.fn(),
+  save: jest.fn(),
+};
+
+const userService = new UserService(mockUserRepository);
+
+// ❌ Bad: Mocking internal implementation
+jest.spyOn(userService, '_validateEmail'); // Don't mock privates
+```
+
+### When to Mock
+- External services (APIs, databases, file system)
+- Time-dependent operations (`Date.now()`, `setTimeout`)
+- Random number generation
+- Environment-specific behavior
+
+### When NOT to Mock
+- The code under test itself
+- Pure utility functions
+- Data structures
+- Simple value objects
+
+## Testing Async Code
+
+```typescript
+// ✅ Good: Proper async handling
+it('should fetch and process user data', async () => {
+  mockApi.getUser.mockResolvedValue({ id: '1', name: 'Test' });
+  
+  const result = await userService.getFormattedUser('1');
+  
+  expect(result).toEqual({ displayName: 'Test' });
+});
+
+// ✅ Good: Testing rejections
+it('should throw when user not found', async () => {
+  mockApi.getUser.mockRejectedValue(new NotFoundError());
+  
+  await expect(userService.getFormattedUser('999'))
+    .rejects
+    .toThrow(NotFoundError);
+});
+```
+
+## Testing Edge Cases
+
+Always test:
+- Empty inputs (empty string, empty array, null, undefined)
+- Boundary values (0, -1, MAX_INT, empty collections)
+- Invalid inputs (wrong types, malformed data)
+- Error conditions (network failures, timeouts)
+- Concurrent operations (race conditions)
+
+```typescript
+describe('paginate', () => {
+  it('should return empty array when items is empty', () => {
+    expect(paginate([], 1, 10)).toEqual([]);
+  });
+  
+  it('should return all items when page size exceeds total', () => {
+    expect(paginate([1, 2, 3], 1, 100)).toEqual([1, 2, 3]);
+  });
+  
+  it('should throw when page number is zero', () => {
+    expect(() => paginate([1, 2], 0, 10)).toThrow('Page must be >= 1');
+  });
+  
+  it('should throw when page number is negative', () => {
+    expect(() => paginate([1, 2], -1, 10)).toThrow('Page must be >= 1');
+  });
+});
+```
+
+## Test Data Management
+
+```typescript
+// ✅ Good: Factory functions for test data
+function createTestUser(overrides: Partial<User> = {}): User {
+  return {
+    id: 'test-id',
+    email: 'test@example.com',
+    name: 'Test User',
+    createdAt: new Date('2024-01-01'),
+    ...overrides,
+  };
+}
+
+it('should format user name', () => {
+  const user = createTestUser({ name: 'John Doe' });
+  expect(formatUserName(user)).toBe('J. Doe');
+});
+```
+
+## Component Testing (React)
+
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+
+describe('LoginForm', () => {
+  it('should call onSubmit with credentials when form is submitted', async () => {
+    const mockSubmit = jest.fn();
+    render(<LoginForm onSubmit={mockSubmit} />);
+    
+    await userEvent.type(screen.getByLabelText('Email'), 'test@example.com');
+    await userEvent.type(screen.getByLabelText('Password'), 'password123');
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
+    
+    expect(mockSubmit).toHaveBeenCalledWith({
+      email: 'test@example.com',
+      password: 'password123',
+    });
+  });
+  
+  it('should display error message when submission fails', async () => {
+    const mockSubmit = jest.fn().mockRejectedValue(new Error('Invalid credentials'));
+    render(<LoginForm onSubmit={mockSubmit} />);
+    
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
+    
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid credentials');
+  });
+});
+```
+
+## Code Coverage
+
+- Aim for **80%+ coverage** on business logic
+- Don't chase 100% - focus on meaningful tests
+- Cover all branches in critical paths
+- Ignore generated code and boilerplate

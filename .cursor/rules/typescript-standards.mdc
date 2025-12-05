@@ -1,0 +1,126 @@
+---
+description: "TypeScript and JavaScript best practices and conventions"
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.mjs", "**/*.cjs"]
+alwaysApply: false
+---
+
+# TypeScript/JavaScript Standards
+
+## Type Safety
+
+<must>
+- Use explicit types for function parameters and return values
+- Define interfaces for all object shapes and data structures
+- Prefer `interface` over `type` for object definitions (better error messages)
+- Use `unknown` over `any` when type is truly unknown
+- Handle `null` and `undefined` explicitly with proper narrowing
+- Use discriminated unions for complex state
+</must>
+
+<must_not>
+- Use `any` type (use `unknown` + type guards instead)
+- Use `// @ts-ignore` or `// @ts-expect-error` without documented reason
+- Use non-null assertion `!` without safety guarantee
+- Leave implicit `any` from untyped imports
+</must_not>
+
+## Code Structure
+
+### Functions
+```typescript
+// ✅ Good: Clear types, single responsibility
+function calculateTotal(items: CartItem[]): Money {
+  return items.reduce((sum, item) => sum.add(item.price), Money.zero());
+}
+
+// ❌ Bad: Unclear types, multiple concerns
+function processCart(cart: any) {
+  // validates, calculates, saves, sends email...
+}
+```
+
+### Error Handling
+```typescript
+// ✅ Good: Typed errors, explicit handling
+class ValidationError extends Error {
+  constructor(public field: string, message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+// Use Result type for expected failures
+type Result<T, E> = { success: true; data: T } | { success: false; error: E };
+```
+
+### Async/Await
+```typescript
+// ✅ Good: Proper error handling
+async function fetchUser(id: string): Promise<User> {
+  try {
+    const response = await api.get(`/users/${id}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      throw new UserNotFoundError(id);
+    }
+    throw error;
+  }
+}
+
+// ❌ Bad: Swallowing errors
+async function fetchUser(id: string) {
+  try {
+    return await api.get(`/users/${id}`);
+  } catch {
+    return null; // Error context lost
+  }
+}
+```
+
+## Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|---------|
+| Variables/Functions | camelCase | `getUserById`, `isActive` |
+| Classes/Types/Interfaces | PascalCase | `UserService`, `ApiResponse` |
+| Constants | SCREAMING_SNAKE | `MAX_RETRY_COUNT` |
+| Files (components) | PascalCase | `UserProfile.tsx` |
+| Files (utilities) | camelCase or kebab | `userUtils.ts`, `user-utils.ts` |
+| Private fields | `#` prefix or `_` | `#internalState`, `_cache` |
+
+## Import Organization
+
+```typescript
+// 1. Node built-ins
+import { readFile } from 'fs/promises';
+
+// 2. External packages
+import React from 'react';
+import { z } from 'zod';
+
+// 3. Internal aliases (@/)
+import { Button } from '@/components/ui';
+import { useAuth } from '@/hooks';
+
+// 4. Relative imports
+import { validateInput } from './utils';
+import type { FormProps } from './types';
+```
+
+## Modern Patterns
+
+### Prefer
+- Optional chaining: `user?.profile?.name`
+- Nullish coalescing: `value ?? defaultValue`
+- Template literals over concatenation
+- Array methods (`.map`, `.filter`, `.reduce`) over loops
+- Destructuring for clean parameter access
+- `const` by default, `let` when reassignment needed
+
+### Avoid
+- `var` declarations
+- `==` loose equality (use `===`)
+- Nested ternaries (use if/else or early returns)
+- Magic numbers/strings (extract to named constants)
+- Mutating function parameters
