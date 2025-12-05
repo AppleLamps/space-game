@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   Color,
   Euler,
@@ -25,11 +25,19 @@ const terrainCache = new Map<string, { geometry: PlaneGeometry; material: MeshSt
 const rockCache = new Map<
   string,
   {
-    near: { mesh: InstancedMesh; list: { position: Vector3; radius: number }[] }
-    far: { mesh: InstancedMesh; list: { position: Vector3; radius: number }[] }
+    near: { mesh: InstancedMesh; list: { position: Vector3; radius: number }[]; geo: IcosahedronGeometry }
+    far: { mesh: InstancedMesh; list: { position: Vector3; radius: number }[]; geo: IcosahedronGeometry }
     material: MeshStandardMaterial
   }
 >()
+
+const patchShader = (source: string, search: string, replace: string, label: string) => {
+  if (!source.includes(search)) {
+    console.warn(`Terrain shader patch skipped: missing ${label}`)
+    return source
+  }
+  return source.replace(search, replace)
+}
 
 interface TerrainProps {
   biome: Biome
@@ -67,7 +75,8 @@ const Terrain = ({ biome, onRocksReady }: TerrainProps) => {
       shader.uniforms.uNoiseFreq = { value: biome.heightParams.noiseFreq }
       shader.uniforms.uNoiseAmp = { value: biome.heightParams.noiseAmp }
 
-      shader.vertexShader = shader.vertexShader.replace(
+      shader.vertexShader = patchShader(
+        shader.vertexShader,
         '#include <common>',
         `#include <common>
         uniform float uRidgeFreq;
@@ -84,17 +93,21 @@ const Terrain = ({ biome, onRocksReady }: TerrainProps) => {
           return ridge + dunes + noise;
         }
         `,
+        'common chunk',
       )
 
-      shader.vertexShader = shader.vertexShader.replace(
+      shader.vertexShader = patchShader(
+        shader.vertexShader,
         '#include <begin_vertex>',
         `#include <begin_vertex>
          float h = getHeight(transformed.xz);
          transformed.y += h;
         `,
+        'begin_vertex chunk',
       )
 
-      shader.vertexShader = shader.vertexShader.replace(
+      shader.vertexShader = patchShader(
+        shader.vertexShader,
         '#include <beginnormal_vertex>',
         `float centerH = getHeight(transformed.xz);
          float dHx = getHeight(transformed.xz + vec2(0.05, 0.0)) - centerH;
@@ -103,6 +116,7 @@ const Terrain = ({ biome, onRocksReady }: TerrainProps) => {
          vec3 objectNormal = displacedNormal;
          vec3 transformedNormal = objectNormal;
         `,
+        'beginnormal_vertex chunk',
       )
     }
 
@@ -161,6 +175,25 @@ const Terrain = ({ biome, onRocksReady }: TerrainProps) => {
 
     return { rocksNear: near, rocksFar: far }
   }, [biome, onRocksReady])
+
+  useEffect(() => () => {
+    const cachedTerrain = terrainCache.get(biome.id)
+    if (cachedTerrain) {
+      terrainCache.delete(biome.id)
+      cachedTerrain.geometry.dispose()
+      cachedTerrain.material.dispose()
+    }
+
+    const cachedRocks = rockCache.get(biome.id)
+    if (cachedRocks) {
+      rockCache.delete(biome.id)
+      cachedRocks.near.mesh.dispose()
+      cachedRocks.far.mesh.dispose()
+      cachedRocks.near.geo.dispose()
+      cachedRocks.far.geo.dispose()
+      cachedRocks.material.dispose()
+    }
+  }, [biome.id])
 
   return (
     <group>

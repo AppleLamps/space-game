@@ -2,6 +2,23 @@
 
 :root {
   color-scheme: dark;
+  --bg-accent-1: rgba(255, 115, 76, 0.12);
+  --bg-accent-2: rgba(255, 184, 112, 0.1);
+  --bg-surface: #0b1224;
+  --slider-track: #1f2937;
+  --slider-thumb: #f97316;
+}
+
+.theme-mars {
+  --bg-accent-1: rgba(255, 115, 76, 0.12);
+  --bg-accent-2: rgba(255, 184, 112, 0.1);
+  --bg-surface: #0b1224;
+}
+
+.theme-ice {
+  --bg-accent-1: rgba(96, 165, 250, 0.12);
+  --bg-accent-2: rgba(191, 219, 254, 0.12);
+  --bg-surface: #0b132a;
 }
 
 * {
@@ -11,9 +28,9 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at 20% 20%, rgba(255, 115, 76, 0.12), transparent 30%),
-    radial-gradient(circle at 80% 0%, rgba(255, 184, 112, 0.1), transparent 25%),
-    #0b1224;
+  background: radial-gradient(circle at 20% 20%, var(--bg-accent-1), transparent 30%),
+    radial-gradient(circle at 80% 0%, var(--bg-accent-2), transparent 25%),
+    var(--bg-surface);
   color: #e2e8f0;
 }
 
@@ -28,3 +45,35 @@ select:focus-visible {
   min-height: 100vh;
 }
 
+.slider-input {
+  appearance: none;
+  height: 0.75rem;
+  border-radius: 9999px;
+  background: var(--slider-track);
+  outline: none;
+}
+
+.slider-input::-webkit-slider-thumb {
+  appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  background: var(--slider-thumb);
+  border: 2px solid #0f172a;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.slider-input::-moz-range-thumb {
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  background: var(--slider-thumb);
+  border: 2px solid #0f172a;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.slider-input::-moz-range-track {
+  background: transparent;
+}

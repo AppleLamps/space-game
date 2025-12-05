@@ -1,6 +1,12 @@
-import { Canvas, useThree } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
-import * as THREE from 'three'
+import { OrthographicCamera, View } from '@react-three/drei'
+import type { MutableRefObject } from 'react'
+import { useEffect, useMemo } from 'react'
+import {
+  CatmullRomCurve3,
+  MeshBasicMaterial,
+  TubeGeometry,
+  Vector3,
+} from 'three'
 import type { RoverPose } from '../../types/rover'
 
 interface MiniMapProps {
@@ -8,41 +14,42 @@ interface MiniMapProps {
   ghostPose?: RoverPose | null
   zoom?: number
   trail: [number, number, number][]
+  trackRef: MutableRefObject<HTMLDivElement | null>
 }
 
-const MiniMapScene = ({ pose, ghostPose, trail }: MiniMapProps) => {
-  const { invalidate } = useThree()
-  const lineMesh = useRef<THREE.Mesh>(null)
+interface MiniMapViewProps extends Omit<MiniMapProps, 'trackRef'> {
+  track: MutableRefObject<HTMLDivElement | null>
+}
+
+const buildTrailGeometry = (trail: [number, number, number][]) => {
+  if (trail.length < 2) return null
+  const points = trail.map((p) => new Vector3(p[0], 0.05, p[2]))
+  const curve = new CatmullRomCurve3(points, false, 'centripetal')
+  const segments = Math.max(points.length * 2, 12)
+  return new TubeGeometry(curve, segments, 0.05, 6, false)
+}
+
+export const MiniMapView = ({ track, pose, ghostPose, trail, zoom = 18 }: MiniMapViewProps) => {
   const trailMaterial = useMemo(
-    () => new THREE.MeshBasicMaterial({ color: '#f97316', transparent: true, opacity: 0.9 }),
+    () => new MeshBasicMaterial({ color: '#f97316', transparent: true, opacity: 0.9 }),
     [],
   )
 
-  useEffect(() => {
-    if (!lineMesh.current) {
-      invalidate()
-      return
-    }
-    const points = trail.map((p) => new THREE.Vector3(p[0], 0.05, p[2]))
-    if (points.length < 2) {
-      lineMesh.current.visible = false
-      invalidate()
-      return
-    }
-    const curve = new THREE.CatmullRomCurve3(points)
-    const geom = new THREE.TubeGeometry(curve, Math.max(points.length * 2, 12), 0.05, 6, false)
-    const oldGeo = lineMesh.current.geometry
-    lineMesh.current.geometry = geom
-    lineMesh.current.visible = true
-    oldGeo?.dispose()
-    invalidate()
-    return () => {
-      geom.dispose()
-    }
-  }, [ghostPose, invalidate, pose, trail])
+  const trailGeometry = useMemo(() => buildTrailGeometry(trail), [trail])
+
+  useEffect(() => () => {
+    trailGeometry?.dispose()
+  }, [trailGeometry])
 
   return (
-    <>
+    <View track={track} id="minimap-view">
+      <OrthographicCamera
+        makeDefault={false}
+        position={[0, 30, 0]}
+        up={[0, 0, -1]}
+        zoom={zoom}
+      />
+
       <ambientLight intensity={0.7} />
       <directionalLight position={[12, 20, 8]} intensity={0.6} />
 
@@ -73,29 +80,22 @@ const MiniMapScene = ({ pose, ghostPose, trail }: MiniMapProps) => {
         </group>
       )}
 
-      <mesh ref={lineMesh} visible={false} material={trailMaterial} />
-    </>
+      <mesh geometry={trailGeometry ?? undefined} visible={!!trailGeometry} material={trailMaterial} />
+    </View>
   )
 }
 
-const MiniMap = ({ pose, ghostPose, zoom, trail }: MiniMapProps) => {
-  return (
-    <div
-      className="pointer-events-auto h-52 w-52 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/80 shadow-2xl backdrop-blur sm:h-64 sm:w-64"
-      role="img"
-      aria-label="Top-down minimap showing rover trail"
-      aria-live="polite"
-    >
-      <Canvas
-        orthographic
-        frameloop="demand"
-        camera={{ position: [0, 30, 0], up: [0, 0, -1], zoom }}
-      >
-        <MiniMapScene pose={pose} ghostPose={ghostPose} trail={trail} />
-      </Canvas>
-    </div>
-  )
-}
+const MiniMap = ({ trackRef, zoom, trail }: MiniMapProps) => (
+  <div
+    ref={trackRef}
+    className="pointer-events-auto h-52 w-52 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/80 shadow-2xl backdrop-blur sm:h-64 sm:w-64"
+    role="img"
+    aria-label="Top-down minimap showing rover trail"
+    aria-live="polite"
+    data-zoom={zoom}
+    data-trail-size={trail.length}
+  />
+)
 
 export default MiniMap
 

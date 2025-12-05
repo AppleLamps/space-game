@@ -1,5 +1,6 @@
 import type { RoverPose } from '../../types/rover'
 import type { RoverControls } from '../../hooks/useRoverControls'
+import Slider from './Slider'
 
 interface ControlsPanelProps {
   controls: RoverControls
@@ -142,28 +143,24 @@ const ControlsPanel = ({
         <label className="mb-2 block text-sm font-medium text-slate-200">
           Speed: <span className="font-semibold text-orange-300">{controls.speed.toFixed(1)} m/s</span>
         </label>
-        <input
-          type="range"
+        <Slider
           min={1}
           max={10}
           step={0.5}
           value={controls.speed}
-          onChange={(event) => controls.setSpeed(Number(event.target.value))}
-          aria-valuetext={`${controls.speed.toFixed(1)} meters per second`}
-          className="w-full accent-orange-500 focus-visible:outline-2 focus-visible:outline-orange-400"
+          onChange={controls.setSpeed}
+          ariaValueText={`${controls.speed.toFixed(1)} meters per second`}
         />
         <label className="mt-3 mb-2 block text-sm font-medium text-slate-200">
           Traction: <span className="font-semibold text-orange-300">{(traction * 100).toFixed(0)}%</span>
         </label>
-        <input
-          type="range"
+        <Slider
           min={0.2}
           max={1.5}
           step={0.05}
           value={traction}
-          onChange={(event) => onChangeTraction(Number(event.target.value))}
-          aria-valuetext={`${(traction * 100).toFixed(0)} percent`}
-          className="w-full accent-orange-500 focus-visible:outline-2 focus-visible:outline-orange-400"
+          onChange={onChangeTraction}
+          ariaValueText={`${(traction * 100).toFixed(0)} percent`}
         />
         <div className="mt-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Rover Presets</p>
@@ -226,16 +223,15 @@ const ControlsPanel = ({
         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
           Replay Timeline (real-time)
         </label>
-        <input
-          type="range"
+        <Slider
           min={0}
           max={hasDuration ? duration : 0}
           step={hasDuration ? Math.max(duration / 200, 0.05) : 0.05}
           value={hasDuration ? playhead : 0}
-          onChange={(event) => onSeek(Number(event.target.value))}
+          onChange={onSeek}
           disabled={!hasDuration}
-          className="w-full accent-purple-500 focus-visible:outline-2 focus-visible:outline-orange-400 disabled:opacity-60"
-          aria-valuetext={hasDuration ? `${formatTime(playhead)} of ${formatTime(duration)}` : 'No recording yet'}
+          ariaValueText={hasDuration ? `${formatTime(playhead)} of ${formatTime(duration)}` : 'No recording yet'}
+          color="purple"
         />
         <div className="mt-1 flex items-center justify-between text-xs text-slate-400">
           <span>{formatTime(playhead)}</span>

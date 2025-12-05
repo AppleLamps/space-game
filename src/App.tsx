@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Lighting from './components/scene/Lighting'
 import Rover from './components/scene/Rover'
 import Terrain from './components/scene/Terrain'
-import MiniMap from './components/ui/MiniMap'
+import MiniMap, { MiniMapView } from './components/ui/MiniMap'
 import ControlsPanel from './components/ui/ControlsPanel'
 import HudOverlay from './components/ui/HudOverlay'
 import { useRoverControls } from './hooks/useRoverControls'
@@ -38,6 +38,7 @@ function App() {
   const trailRef = useRef<[number, number, number][]>([])
   const [, forceTrailRender] = useState(0)
   const [minimapZoom, setMinimapZoom] = useState(() => settings.minimap.defaultZoom)
+  const minimapTrackRef = useRef<HTMLDivElement>(null)
   const [traction, setTraction] = useState(TRACTION)
   const [cameraPreset, setCameraPreset] = useState<'default' | 'top' | 'chase'>('default')
   const poseRef = useRef<RoverPose>(pose)
@@ -194,6 +195,13 @@ function App() {
             settings={settings}
             getInputState={controls.getInputState}
           />
+          <MiniMapView
+            track={minimapTrackRef}
+            pose={pose}
+            ghostPose={ghostPose}
+            zoom={minimapZoom}
+            trail={trailRef.current}
+          />
           {import.meta.env.DEV && <StatsGl className="top-auto bottom-2 left-2 right-auto" />}
         </Canvas>
       </div>
@@ -270,7 +278,13 @@ function App() {
                 </button>
                 <BreadcrumbToggle enabled={trailEnabled} onToggle={() => setTrailEnabled((v) => !v)} />
               </div>
-              <MiniMap pose={pose} ghostPose={ghostPose} zoom={minimapZoom} trail={trailRef.current} />
+              <MiniMap
+                trackRef={minimapTrackRef}
+                pose={pose}
+                ghostPose={ghostPose}
+                zoom={minimapZoom}
+                trail={trailRef.current}
+              />
             </div>
           </div>
         </div>
