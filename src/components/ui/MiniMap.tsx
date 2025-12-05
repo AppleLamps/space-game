@@ -1,21 +1,45 @@
 import { Canvas, useThree } from '@react-three/fiber'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { RoverPose } from '../../types/rover'
 
 interface MiniMapProps {
   pose: RoverPose
   ghostPose?: RoverPose | null
-  zoom: number
+  zoom?: number
   trail: [number, number, number][]
 }
 
 const MiniMapScene = ({ pose, ghostPose, trail }: MiniMapProps) => {
   const { invalidate } = useThree()
+  const lineMesh = useRef<THREE.Mesh>(null)
+  const trailMaterial = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: '#f97316', transparent: true, opacity: 0.9 }),
+    [],
+  )
 
   useEffect(() => {
+    if (!lineMesh.current) {
+      invalidate()
+      return
+    }
+    const points = trail.map((p) => new THREE.Vector3(p[0], 0.05, p[2]))
+    if (points.length < 2) {
+      lineMesh.current.visible = false
+      invalidate()
+      return
+    }
+    const curve = new THREE.CatmullRomCurve3(points)
+    const geom = new THREE.TubeGeometry(curve, Math.max(points.length * 2, 12), 0.05, 6, false)
+    const oldGeo = lineMesh.current.geometry
+    lineMesh.current.geometry = geom
+    lineMesh.current.visible = true
+    oldGeo?.dispose()
     invalidate()
-  }, [pose, ghostPose, trail, invalidate])
+    return () => {
+      geom.dispose()
+    }
+  }, [ghostPose, invalidate, pose, trail])
 
   return (
     <>
@@ -49,22 +73,19 @@ const MiniMapScene = ({ pose, ghostPose, trail }: MiniMapProps) => {
         </group>
       )}
 
-      {trail.length > 1 && (
-        <line>
-          <bufferGeometry
-            attach="geometry"
-            setFromPoints={trail.map((p) => new THREE.Vector3(p[0], 0.05, p[2]))}
-          />
-          <lineBasicMaterial color="#f97316" linewidth={2} />
-        </line>
-      )}
+      <mesh ref={lineMesh} visible={false} material={trailMaterial} />
     </>
   )
 }
 
 const MiniMap = ({ pose, ghostPose, zoom, trail }: MiniMapProps) => {
   return (
-    <div className="pointer-events-auto h-52 w-52 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/80 shadow-2xl backdrop-blur sm:h-64 sm:w-64">
+    <div
+      className="pointer-events-auto h-52 w-52 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/80 shadow-2xl backdrop-blur sm:h-64 sm:w-64"
+      role="img"
+      aria-label="Top-down minimap showing rover trail"
+      aria-live="polite"
+    >
       <Canvas
         orthographic
         frameloop="demand"

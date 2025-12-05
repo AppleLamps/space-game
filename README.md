@@ -1,17 +1,16 @@
-# Mars Rover Simulator (React + Three.js + Tailwind)
+# Mars Rover Simulator
 
-An interactive 3D Mars rover playground built with React, Vite, Tailwind CSS, and Three.js (via React Three Fiber). Drive a rover across procedurally generated terrain with orbit/pan/zoom camera controls, animated wheels, and a synchronized mini-map.
+An interactive 3D rover sandbox built with React, Vite, Tailwind CSS, and Three.js via React Three Fiber. Drive, replay, and explore seeded biomes with responsive HUD, accessibility affordances, and performance-focused optimizations.
 
 ## Features
 
-- Three.js scene via React Three Fiber + drei helpers
-- Procedural seeded terrains (biome selector: Mars, Icy, Windy Dunes) with instanced rocks
-- Boxy rover with animated wheels, tilt over terrain, traction/slip model, and basic rock avoidance
-- Keyboard driving (WASD or arrows) with drive toggle, speed, and traction sliders
-- Orbit/pan/zoom camera with reset and presets (Default/Top/Chase)
-- Mini-map (top-down orthographic) with zoom controls, ghost marker, and breadcrumb trail toggle
-- HUD telemetry: speed, heading, RPM, FPS, traction, slip/grip, drive/record/play states
-- Replay/ghost: record poses, persist to localStorage, playback with scene + minimap ghost
+- Procedural, seeded biomes with cached terrain and instanced rocks spread across the full play area; color/height params per biome.
+- Rover physics: traction/slip model, rock avoidance, wheel spin, tilt from surface normals, and hard clamping to terrain bounds.
+- Input + camera: drive toggle with speed/traction sliders, orbit controls with reset and presets (Default/Top/Chase) now driven by critically damped springs (2.5 Hz presets, 3 Hz chase) with soft lag clamp and sustained-input cancel guard to prevent jittery fights.
+- Mini-map: top-down orthographic view, mesh-based breadcrumb trail, zoom/reset controls, and ghost during playback.
+- Replay & ghost: record/playback poses, persist to `localStorage`, export JSON, timeline guarded for empty recordings with mm:ss labels; visuals stay eased (shortest-path heading with deadband and mild smoothing) while timing remains strict real-time.
+- HUD & accessibility: live telemetry (speed, heading, RPM, FPS, traction, slip, drive/record/play), aria labels/live regions, focusable overlays, drive-disabled banner.
+- Performance: throttled HUD/replay ticks, cached biomes/rocks to reduce GC churn.
 
 ## Prerequisites
 
@@ -21,75 +20,80 @@ An interactive 3D Mars rover playground built with React, Vite, Tailwind CSS, an
 ## Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Start dev server
 npm run dev
 
-# Build for production
+# Production
 npm run build
-
-# Preview production build
 npm run preview
+
+# Lint / Test
+npm run lint
+npm run test
 ```
 
-Open the dev server URL shown in the console (default <http://localhost:5173>).
+Open the dev server URL printed to the console (default <http://localhost:5173>).
 
 ## Scripts
 
 | Command | Description |
-|---------|-------------|
-| `npm run dev` | Start the Vite dev server |
-| `npm run build` | Type-check then build for production |
-| `npm run preview` | Preview the production build |
-| `npm run lint` | Run ESLint across the repo |
+| --- | --- |
+| npm run dev | Start the Vite dev server |
+| npm run build | Type-check then build for production |
+| npm run preview | Preview the production build |
+| npm run lint | Run ESLint across the repo |
+| npm run test | Run Vitest test suite |
 
-## Controls
+## Controls & UI
 
-- Toggle drive: click “Driving: ON/OFF” (input ignored while off)
-- Move: W / ↑ (forward), S / ↓ (reverse), A / ← (turn left), D / → (turn right)
-- Speed: adjust with the speed slider
-- Traction: adjust grip/slip with the traction slider
-- Reset rover: snaps to origin/zero heading
-- Camera: orbit/pan/zoom with mouse/scroll; presets (Default/Top/Chase); Reset Camera button
-- Biomes: select terrain profile from the dropdown
-- Replay: Start/Stop Recording; Play/Stop Playback (persists across refresh)
-- Minimap: zoom +/- buttons; toggle trail; shows ghost during playback
+- Drive toggle: “Driving: ON/OFF” (input ignored when off).
+- Movement: W/↑ forward, S/↓ reverse, A/← turn left, D/→ turn right.
+- Speed slider: adjusts base drive speed.
+- Traction slider: 0.2–1.5 range to tune grip/slip (matches physics constants).
+- Reset rover: snap to origin and zero heading; drive-disabled banner announces state (aria-live).
+- Camera: orbit/pan/zoom; presets Default/Top/Chase; reset button. Presets glide via critically damped springs; chase follows with soft lag clamp. Preset transitions cancel only on sustained input (≈200 ms plus ~20 px mouse / 28 px touch, tunable).
+- Biomes: select terrain profile; rocks/terrain reuse cached meshes per biome.
+- Replay: start/stop recording; play/stop playback; timeline uses mm:ss, disables when empty; export JSON.
+- Mini-map: zoom in/out/reset, mesh trail toggle, ghost shown during playback.
 
 ## Tech Stack
 
 - React + TypeScript + Vite
 - Three.js via @react-three/fiber and @react-three/drei
-- Tailwind CSS (utility-first styling)
-
-## Notes
-
-- All geometry is generated in code (no external assets required).
-- Tailwind is configured via PostCSS (`postcss.config.js`) and `tailwind.config.js`. Styles live in `src/index.css` using `@import "tailwindcss";`.
-- Rover input is cleared when the tab loses focus to avoid “stuck key” movement on return.
-- Rover pose updates are throttled; replay samples persist to `localStorage` under `rover-replay`.
-- Development-only: the stats overlay appears in dev builds; it is hidden in production.
+- Tailwind CSS (PostCSS pipeline)
+- Testing with Vitest + Testing Library
 
 ## Project Structure (high level)
 
 ```
 src/
-  components/
-    scene/ (Lighting, Terrain, Rover, Ghost)
-    ui/ (ControlsPanel, MiniMap, HudOverlay, BreadcrumbToggle)
-  hooks/ (useRoverControls)
-  simulation/ (terrain, biomes, pose, replay, random)
-  constants/ (simulation.ts)
-  types/ (rover.ts)
   App.tsx
   main.tsx
   index.css
+  components/
+    scene/ (Lighting, Terrain, Rover, Ghost, CameraController)
+    ui/ (ControlsPanel, MiniMap, HudOverlay, BreadcrumbToggle, tests)
+  hooks/ (useRoverControls, useReplay, useSettingsStore)
+  simulation/ (terrain, biomes, pose, replay, random)
+  constants/ (camera, minimap, rover, scene)
+  types/ (rover.ts)
+  test/ (setup, shims)
 ```
 
-## Future Extensions
+## Notes
 
-- Camera feeds and richer HUD overlays (e.g., sensor panels)
-- Telemetry export/playback timeline
-- Additional obstacles/biomes and more accurate collision
-- Improved physics (wheel suspension + traction curves)
+- Replay data persists to `localStorage` under `rover-replay`.
+- HUD/replay updates are throttled to reduce render churn; Stats overlay (drei `StatsGl`) appears only in dev.
+- Rocks and terrain meshes/materials are cached per biome to avoid reallocations when switching biomes.
+- Rover position is clamped within the terrain bounds; collisions push away from rocks.
+
+## Tuning (key constants)
+
+- Camera springs: presets run at 2.5 Hz, chase at 3 Hz (critically damped) — in `src/constants/camera.ts`.
+- Chase lag clamp: max trailing distance is 1.75× the nominal follow distance; excess lag gently increases corrective force.
+- Preset cancel thresholds: sustained input ≈200 ms plus drag >=20 px (mouse) or >=28 px (touch); raise px first (e.g., 25/32) before nudging duration (230–250 ms).
+- Visual heading smoothing: 6° deadband for indicators/ghost; timing/physics heading remains unchanged.
+- Minimap: zoom range defaults from settings (12 base, clamped to 8–20 by `zoomRange`); breadcrumb trail capped at 240 points to stay performant.
+- Traction tuning: UI slider clamps to 0.2–1.5 to mirror physics traction bounds.
+- Pose emission: rover pose publish rate targets 15 Hz (with movement/heading epsilons); replay sampling respects the emitted cadence.
+- UI cadence: HUD updates throttle to ~150 ms; replay playhead ticks at ~50 ms while preserving real-time timing.

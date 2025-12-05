@@ -1,5 +1,5 @@
 import type { RoverPose } from '../types/rover'
-import { HEADING_EPSILON, POSITION_EPSILON, POSE_EMIT_HZ } from '../constants/simulation'
+import { HEADING_EPSILON, POSITION_EPSILON, POSE_EMIT_HZ } from '../constants/rover'
 
 export const shouldEmitPose = (current: RoverPose, next: RoverPose, elapsed: number): boolean => {
   const positionDelta =

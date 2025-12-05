@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DEFAULT_SPEED } from '../constants/simulation'
+import { DEFAULT_SPEED } from '../constants/rover'
 import type { InputState } from '../types/rover'
 
 const KEY_BINDINGS: Record<string, keyof InputState> = {
@@ -18,13 +18,14 @@ export interface RoverControls {
   speed: number
   setSpeed: (value: number) => void
   toggleDrive: () => void
+  setDriveEnabled: (value: boolean) => void
   reset: () => void
   resetSignal: number
   getInputState: () => InputState
 }
 
 export function useRoverControls(initialSpeed = DEFAULT_SPEED): RoverControls {
-  const [driveEnabled, setDriveEnabled] = useState(false)
+  const [driveEnabled, setDriveEnabledState] = useState(false)
   const [speed, setSpeedState] = useState(initialSpeed)
   const [resetSignal, setResetSignal] = useState(0)
   const keysRef = useRef<InputState>({
@@ -46,12 +47,19 @@ export function useRoverControls(initialSpeed = DEFAULT_SPEED): RoverControls {
   const getInputState = useCallback(() => keysRef.current, [])
 
   const toggleDrive = useCallback(() => {
-    setDriveEnabled((current) => {
+    setDriveEnabledState((current) => {
       if (current) {
         clearKeys()
       }
       return !current
     })
+  }, [clearKeys])
+
+  const setDriveEnabled = useCallback((value: boolean) => {
+    setDriveEnabledState(value)
+    if (!value) {
+      clearKeys()
+    }
   }, [clearKeys])
 
   const setSpeed = useCallback((value: number) => {
@@ -60,10 +68,10 @@ export function useRoverControls(initialSpeed = DEFAULT_SPEED): RoverControls {
 
   const reset = useCallback(() => {
     clearKeys()
-    setDriveEnabled(false)
+    setDriveEnabledState(false)
     setSpeed(initialSpeed)
     setResetSignal((value) => value + 1)
-  }, [clearKeys, initialSpeed])
+  }, [clearKeys, initialSpeed, setSpeed])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -112,11 +120,12 @@ export function useRoverControls(initialSpeed = DEFAULT_SPEED): RoverControls {
       speed,
       setSpeed,
       toggleDrive,
+      setDriveEnabled,
       reset,
       resetSignal,
       getInputState,
     }),
-    [driveEnabled, speed, toggleDrive, reset, resetSignal, getInputState],
+    [driveEnabled, speed, setSpeed, toggleDrive, setDriveEnabled, reset, resetSignal, getInputState],
   )
 
   return controls

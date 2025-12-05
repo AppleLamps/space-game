@@ -11,6 +11,7 @@ export interface ReplayState {
   samples: PoseSample[]
   startedAt: number
   lastSavedAt: number
+  playhead: number
 }
 
 export const createReplayState = (): ReplayState => ({
@@ -19,6 +20,7 @@ export const createReplayState = (): ReplayState => ({
   samples: [],
   startedAt: 0,
   lastSavedAt: 0,
+  playhead: 0,
 })
 
 const STORAGE_KEY = 'rover-replay'
@@ -48,11 +50,13 @@ export const startRecording = (state: ReplayState) => {
   state.isRecording = true
   state.startedAt = performance.now()
   state.samples = []
+  state.playhead = 0
 }
 
 export const stopRecording = (state: ReplayState) => {
   state.isRecording = false
   state.lastSavedAt = performance.now()
+  state.playhead = state.samples[state.samples.length - 1]?.time ?? 0
   if (state.samples.length) {
     safeSave(state.samples)
   }
@@ -70,24 +74,40 @@ export const startPlayback = (state: ReplayState) => {
   }
   if (!state.samples.length) return
   state.isPlaying = true
-  state.startedAt = performance.now()
+  state.startedAt = performance.now() - state.playhead
 }
 
 export const stopPlayback = (state: ReplayState) => {
   state.isPlaying = false
+  const duration = getDuration(state)
+  state.playhead = Math.min(state.playhead, duration)
 }
 
-export const getGhostPose = (state: ReplayState): RoverPose | null => {
-  if (!state.isPlaying || state.samples.length === 0) return null
+export const getDuration = (state: ReplayState): number =>
+  state.samples[state.samples.length - 1]?.time ?? 0
 
-  const elapsed = performance.now() - state.startedAt
-  const total = state.samples[state.samples.length - 1]?.time ?? 0
-  if (elapsed >= total) {
+export const seekPlayback = (state: ReplayState, time: number) => {
+  const duration = getDuration(state)
+  state.playhead = Math.max(0, Math.min(time, duration))
+  if (state.isPlaying) {
+    state.startedAt = performance.now() - state.playhead
+  }
+}
+
+export const exportReplay = (state: ReplayState): string => {
+  const samples = state.samples.length ? state.samples : safeLoad()
+  return JSON.stringify(samples, null, 2)
+}
+
+export const getGhostPoseAt = (state: ReplayState, time: number): RoverPose | null => {
+  if (state.samples.length === 0) return null
+  const duration = getDuration(state)
+  const clamped = Math.min(Math.max(time, 0), duration)
+  if (clamped >= duration) {
     return state.samples[state.samples.length - 1].pose
   }
 
-  // find nearest samples for interpolation
-  let nextIndex = state.samples.findIndex((s) => s.time >= elapsed)
+  let nextIndex = state.samples.findIndex((s) => s.time >= clamped)
   if (nextIndex <= 0) {
     nextIndex = 1
   }
@@ -95,7 +115,7 @@ export const getGhostPose = (state: ReplayState): RoverPose | null => {
   const next = state.samples[nextIndex]
   if (!prev || !next) return null
 
-  const alpha = (elapsed - prev.time) / Math.max(next.time - prev.time, 1)
+  const alpha = (clamped - prev.time) / Math.max(next.time - prev.time, 1)
   const lerp = (a: number, b: number) => a + (b - a) * alpha
 
   return {
@@ -106,5 +126,12 @@ export const getGhostPose = (state: ReplayState): RoverPose | null => {
     ],
     heading: lerp(prev.pose.heading, next.pose.heading),
   }
+}
+
+export const getGhostPose = (state: ReplayState): RoverPose | null => {
+  if (!state.isPlaying) return null
+  const elapsed = performance.now() - state.startedAt
+  state.playhead = elapsed
+  return getGhostPoseAt(state, state.playhead)
 }
 

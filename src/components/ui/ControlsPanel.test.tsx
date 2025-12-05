@@ -4,9 +4,9 @@ import ControlsPanel from './ControlsPanel'
 const mockControls = {
   driveEnabled: true,
   speed: 4,
-  setSpeed: () => {},
-  toggleDrive: () => {},
-  reset: () => {},
+  setSpeed: () => { },
+  toggleDrive: () => { },
+  reset: () => { },
   resetSignal: 0,
   getInputState: () => ({ forward: false, backward: false, left: false, right: false }),
 }
@@ -19,14 +19,26 @@ describe('ControlsPanel', () => {
       <ControlsPanel
         controls={mockControls}
         pose={pose}
-        onResetCamera={() => {}}
-        onStartRecord={() => {}}
-        onStopRecord={() => {}}
+        onResetCamera={() => { }}
+        onPresetCamera={() => { }}
+        onStartRecord={() => { }}
+        onStopRecord={() => { }}
         isRecording={false}
-        onStartPlayback={() => {}}
-        onStopPlayback={() => {}}
+        onStartPlayback={() => { }}
+        onStopPlayback={() => { }}
         isPlaying={false}
         hasRecording={false}
+        playhead={0}
+        duration={0}
+        onSeek={() => { }}
+        onExport={() => { }}
+        biomeId="default"
+        biomes={[{ id: 'default', name: 'Default' }]}
+        onChangeBiome={() => { }}
+        traction={1}
+        onChangeTraction={() => { }}
+        roverPresets={['default']}
+        onSelectRoverPreset={() => { }}
       />,
     )
     expect(getByText('Interactive Lab')).toBeInTheDocument()

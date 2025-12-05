@@ -1,31 +1,27 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { Group, Mesh } from 'three'
-import { BoxGeometry, CylinderGeometry, Euler, MathUtils, Vector3 } from 'three'
+import { BoxGeometry, CylinderGeometry, MathUtils, Vector3 } from 'three'
 import { useFrame } from '@react-three/fiber'
-import type { RoverPose } from '../../types/rover'
+import type { RoverPose, RoverTelemetry } from '../../types/rover'
 import type { RoverControls } from '../../hooks/useRoverControls'
 import {
-  ACCELERATION,
-  DRAG,
-  MAX_SPEED,
-  MIN_WHEEL_SPIN,
   ROVER_BASE_HEIGHT,
-  SLIP_FACTOR,
-  TURN_MIN_SCALE,
-  TURN_RATE,
-  WHEEL_RADIUS,
-  WHEEL_ROTATION_SCALE,
-} from '../../constants/simulation'
+  ROVER_TUNING_PRESETS,
+  type RoverTuning,
+} from '../../constants/rover'
 import { generateHeight, terrainNormal } from '../../simulation/terrain'
 import { shouldEmitPose } from '../../simulation/pose'
 import type { Biome } from '../../simulation/biomes'
+import { TERRAIN_SIZE } from '../../constants/scene'
 
 interface RoverProps {
   controls: RoverControls
   onPoseChange?: (pose: RoverPose) => void
   biome: Biome
   rocks?: { position: Vector3; radius: number }[]
-  onTelemetry?: (data: { rpm: number; slipping: boolean }) => void
+  traction?: number
+  tuning?: RoverTuning
+  onTelemetry?: (data: RoverTelemetry) => void
 }
 
 const wheelOffsets: [number, number, number][] = [
@@ -37,7 +33,16 @@ const wheelOffsets: [number, number, number][] = [
   [-1.1, -0.4, -1.1],
 ]
 
-const Rover = ({ controls, onPoseChange, biome, rocks = [], onTelemetry }: RoverProps) => {
+const Rover = ({
+  controls,
+  onPoseChange,
+  biome,
+  rocks = [],
+  traction = 1,
+  tuning,
+  onTelemetry,
+}: RoverProps) => {
+  const config = tuning ?? ROVER_TUNING_PRESETS.default
   const roverRef = useRef<Group>(null)
   const wheelRefs = useRef<Mesh[]>([])
   const headingRef = useRef(0)
@@ -51,6 +56,9 @@ const Rover = ({ controls, onPoseChange, biome, rocks = [], onTelemetry }: Rover
   const velocityRef = useRef(new Vector3())
   const slipRef = useRef(false)
   const rpmRef = useRef(0)
+  const pitchVelRef = useRef(0)
+  const rollVelRef = useRef(0)
+  const terrainLimit = (TERRAIN_SIZE * 0.5) - 1
 
   useEffect(() => {
     if (!roverRef.current) return
@@ -59,8 +67,10 @@ const Rover = ({ controls, onPoseChange, biome, rocks = [], onTelemetry }: Rover
     headingRef.current = 0
     wheelRotationRef.current = 0
     lastPoseRef.current = { position: [0, ROVER_BASE_HEIGHT, 0], heading: 0 }
+    pitchVelRef.current = 0
+    rollVelRef.current = 0
     onPoseChange?.(lastPoseRef.current)
-  }, [controls.resetSignal])
+  }, [controls.resetSignal, onPoseChange])
 
   useFrame((_, delta) => {
     if (!roverRef.current) return
@@ -69,11 +79,12 @@ const Rover = ({ controls, onPoseChange, biome, rocks = [], onTelemetry }: Rover
     const turning = (input.left ? 1 : 0) - (input.right ? 1 : 0)
 
     if (turning !== 0) {
-      const turnScale = Math.max(Math.abs(direction), TURN_MIN_SCALE)
-      headingRef.current += turning * TURN_RATE * delta * turnScale
+      const turnScale = Math.max(Math.abs(direction), config.minTurnScale)
+      headingRef.current += turning * config.turnRate * delta * turnScale
     }
 
     const speedSetting = controls.driveEnabled ? controls.speed : 0
+    const effectiveTraction = MathUtils.clamp(traction, 0.2, 1.5)
 
     if (speedSetting > 0 && direction !== 0) {
       forwardVector.current.set(
@@ -81,30 +92,46 @@ const Rover = ({ controls, onPoseChange, biome, rocks = [], onTelemetry }: Rover
         0,
         -Math.cos(headingRef.current),
       )
-      const accel = ACCELERATION * direction * speedSetting * delta
+      const accel = config.acceleration * direction * speedSetting * delta * effectiveTraction
       velocityRef.current.addScaledVector(forwardVector.current, accel)
     }
 
     // Apply simple drag
-    velocityRef.current.multiplyScalar(Math.pow(DRAG, delta * 60))
+    const drag = Math.pow(config.drag + (1 - Math.min(effectiveTraction, 1)) * 0.05, delta * 60)
+    velocityRef.current.multiplyScalar(drag)
 
     // Slip when turning hard at higher speed
     const lateralSlip = Math.abs(turning) > 0 && velocityRef.current.length() > speedSetting * 0.8
-    const slipFactor = lateralSlip ? SLIP_FACTOR : 1
+    const slipFactor = lateralSlip
+      ? config.slipFactor * (1 - Math.min(effectiveTraction, 1) * 0.5)
+      : 1
     slipRef.current = lateralSlip
 
     // Clamp speed
-    if (velocityRef.current.length() > MAX_SPEED) {
-      velocityRef.current.setLength(MAX_SPEED)
+    if (velocityRef.current.length() > config.maxSpeed) {
+      velocityRef.current.setLength(config.maxSpeed)
     }
 
     roverRef.current.position.addScaledVector(velocityRef.current, slipFactor * delta)
+    roverRef.current.position.x = MathUtils.clamp(
+      roverRef.current.position.x,
+      -terrainLimit,
+      terrainLimit,
+    )
+    roverRef.current.position.z = MathUtils.clamp(
+      roverRef.current.position.z,
+      -terrainLimit,
+      terrainLimit,
+    )
 
     // Wheel rotation from distance traveled
     const distanceTraveled = velocityRef.current.length() * delta
     if (distanceTraveled !== 0) {
       const dirSign = Math.sign(velocityRef.current.dot(forwardVector.current) || direction || 1)
-      const wheelDelta = Math.max(distanceTraveled / WHEEL_RADIUS, MIN_WHEEL_SPIN * delta)
+      const wheelDelta = Math.max(
+        distanceTraveled / config.wheelRadius,
+        config.minWheelSpin * delta,
+      )
       wheelRotationRef.current += dirSign * wheelDelta
       rpmRef.current = (wheelDelta / (2 * Math.PI)) * 60
     }
@@ -116,16 +143,16 @@ const Rover = ({ controls, onPoseChange, biome, rocks = [], onTelemetry }: Rover
     const normal = terrainNormal(roverRef.current.position.x, roverRef.current.position.z, biome)
     const tiltX = Math.atan2(normal[2], normal[1]) // pitch
     const tiltZ = -Math.atan2(normal[0], normal[1]) // roll
-    roverRef.current.rotation.x = MathUtils.lerp(
-      roverRef.current.rotation.x,
-      tiltX,
-      1 - Math.exp(-6 * delta),
-    )
-    roverRef.current.rotation.z = MathUtils.lerp(
-      roverRef.current.rotation.z,
-      tiltZ,
-      1 - Math.exp(-6 * delta),
-    )
+    const k = config.suspension.stiffness
+    const d = config.suspension.damping
+
+    const pitchError = tiltX - roverRef.current.rotation.x
+    pitchVelRef.current += (k * pitchError - d * pitchVelRef.current) * delta
+    roverRef.current.rotation.x += pitchVelRef.current * delta
+
+    const rollError = tiltZ - roverRef.current.rotation.z
+    rollVelRef.current += (k * rollError - d * rollVelRef.current) * delta
+    roverRef.current.rotation.z += rollVelRef.current * delta
 
     const targetY = groundHeight + ROVER_BASE_HEIGHT
     roverRef.current.position.y = MathUtils.lerp(
@@ -139,7 +166,7 @@ const Rover = ({ controls, onPoseChange, biome, rocks = [], onTelemetry }: Rover
       rocks.forEach((rock) => {
         const offset = roverRef.current!.position.clone().sub(rock.position)
         const distance = offset.length()
-        const minDistance = rock.radius + 1.5
+        const minDistance = rock.radius + 1.2
         if (distance < minDistance && distance > 0.01) {
           const push = (minDistance - distance) * 0.4
           roverRef.current!.position.addScaledVector(offset.normalize(), push)
@@ -148,12 +175,12 @@ const Rover = ({ controls, onPoseChange, biome, rocks = [], onTelemetry }: Rover
       })
     }
 
-      wheelRefs.current.forEach((wheel) => {
-        if (!wheel) return
-        wheel.rotation.x = wheelRotationRef.current
-        // align wheels slightly with chassis tilt for visual coherence
-        wheel.rotation.z = roverRef.current?.rotation.z ?? 0
-      })
+    wheelRefs.current.forEach((wheel) => {
+      if (!wheel) return
+      wheel.rotation.x = wheelRotationRef.current
+      // align wheels slightly with chassis tilt for visual coherence
+      wheel.rotation.z = roverRef.current?.rotation.z ?? 0
+    })
 
     const { x, y, z } = roverRef.current.position
     const nextPose: RoverPose = {
@@ -168,13 +195,21 @@ const Rover = ({ controls, onPoseChange, biome, rocks = [], onTelemetry }: Rover
       onPoseChange?.(nextPose)
     }
 
-    onTelemetry?.({ rpm: rpmRef.current, slipping: slipRef.current })
+    onTelemetry?.({
+      rpm: rpmRef.current,
+      slipping: slipRef.current,
+      pitch: MathUtils.radToDeg(roverRef.current.rotation.x),
+      roll: MathUtils.radToDeg(roverRef.current.rotation.z),
+    })
   })
 
   const bodyGeometry = useMemo(() => new BoxGeometry(2.4, 0.6, 3), [])
   const mastGeometry = useMemo(() => new BoxGeometry(0.3, 0.8, 0.3), [])
   const headGeometry = useMemo(() => new BoxGeometry(0.9, 0.35, 0.35), [])
-  const wheelGeometry = useMemo(() => new CylinderGeometry(0.35, 0.35, 0.35, 18), [])
+  const wheelGeometry = useMemo(
+    () => new CylinderGeometry(config.wheelRadius, config.wheelRadius, 0.35, 18),
+    [config.wheelRadius],
+  )
 
   useEffect(() => {
     return () => {

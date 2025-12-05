@@ -6,6 +6,13 @@ export interface RoverPose {
   heading: number;
 }
 
+export interface RoverTelemetry {
+  rpm: number;
+  slipping: boolean;
+  pitch: number;
+  roll: number;
+}
+
 export interface InputState {
   forward: boolean;
   backward: boolean;
